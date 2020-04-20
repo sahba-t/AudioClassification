@@ -129,4 +129,5 @@ dmypy.json
 .pyre/
 /res/wav/test/
 /res/wav/train/
-/res/spectrogram/
+/res/spectrogram/test/
+/res/spectrogram/train/
