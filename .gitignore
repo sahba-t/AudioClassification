@@ -127,5 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-/res/test/
-/res/train/
+/res/wav/test/
+/res/wav/train/
+/res/spectrogram/test/
+/res/spectrogram/train/
