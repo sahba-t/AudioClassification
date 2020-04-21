@@ -4,6 +4,7 @@ import os
 from os import path
 import numpy as np
 import sklearn
+import pickle
 from sklearn.model_selection import train_test_split
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -25,7 +26,7 @@ def build_ys():
     np.save('../res/training_labels', training_labels)
     return training_labels
 
-def load_x_y(data_file_name='../res/data_pca_ncom40.npy'):
+def load_x_y(data_file_name='../res/data_pca_ncom40.npy', test_split=0.15):
     xs = np.load(data_file_name)
     ys = np.load('../res/training_labels.npy')
     print(ys.shape)
@@ -33,22 +34,26 @@ def load_x_y(data_file_name='../res/data_pca_ncom40.npy'):
     #converting to categorical
     ys = keras.utils.to_categorical(ys)
 
-    x_t, x_test, y_t, y_test = train_test_split(xs, ys, test_size=0.15, shuffle=True)
-    return x_t, x_test, y_t, y_test
+    if test_split > 0:
+        x_t, x_test, y_t, y_test = train_test_split(xs, ys, test_size=test_split, shuffle=True)
+        return x_t, x_test, y_t, y_test
+    else:
+        return xs, ys
 
 def build_model():
     model = keras.models.Sequential()
-    model.add(layers.BatchNormalization(input_shape=(40,)))
-    model.add(layers.Dense(75))
+    #model.add(layers.BatchNormalization(input_shape=(40,)))
+    model.add(layers.Dense(60, input_dim=40))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.25))
-    model.add(layers.Dense(100))
+    model.add(layers.Dense(70))
     model.add(layers.Activation('relu'))
     model.add(layers.Dropout(0.25))
+    # model.add(layers.BatchNormalization())
     model.add(layers.Dense(50))
-    model.add(layers.Dropout(0.2))
     model.add(layers.LeakyReLU())
-    model.add(layers.Dense(30))
+    model.add(layers.Dense(15))
+    model.add(layers.BatchNormalization())
     model.add(layers.Dropout(0.2))
     model.add(layers.LeakyReLU())
     model.add(layers.Dense(6, activation='softmax'))
@@ -58,12 +63,37 @@ def build_model():
     return model
 
 def train_and_eval(model, x_train, y_train, x_eval, y_eval):
-    history = model.fit(x_train, y_train, epochs=100, batch_size=128, validation_data=(x_eval, y_eval))
+    history = model.fit(x_train, y_train, epochs=1000, batch_size=128, validation_data=(x_eval, y_eval))
     score = model.evaluate(x_eval, y_eval)
     print(score)
     return history
 
-model = build_model()
-x_train, x_eval, y_train, y_eval = load_x_y()
-print(y_train)
-train_and_eval(model, x_train, y_train, x_eval, y_eval)
+
+def load_test_data(test_data_file_name='../res/test_pca_ncom40.npy', row_dict_name='../res/test_row_dict'):
+    with open(row_dict_name, 'rb') as p_file:
+        row_dict= pickle.load(p_file)
+
+    eval_xs = np.load(test_data_file_name)
+    return eval_xs, row_dict
+
+def train_for_kaggle():
+    model = build_model()
+    x_train, y_train = load_x_y(test_split=0)
+    model.fit(x_train, y_train, epochs=300, batch_size=128)
+    x_test, row_dict = load_test_data()
+    predictions = model.predict(x_test)
+    with open('kaggle.csv', 'w') as csv_stream:
+        csv_stream.write('id,genre\n')
+        for r in range(predictions.shape[0]):
+            predicted_genre = np.argmax(predictions[r,:])
+            file_label = row_dict[r]
+            csv_stream.write(f"{file_label},{predicted_genre}\n")
+
+def validate_model():
+
+    model = build_model()
+    x_train, x_eval, y_train, y_eval = load_x_y()
+    print(y_train)
+    train_and_eval(model, x_train, y_train, x_eval, y_eval)
+
+train_for_kaggle()
