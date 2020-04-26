@@ -41,24 +41,25 @@ def load_x_y(data_file_name='../res/data_pca_ncom40.npy', test_split=0.15):
     else:
         return xs, ys
 
-def build_model(input_dim = 40):
+def build_model(input_dim=40):
     model = keras.models.Sequential()
     #model.add(layers.BatchNormalization(input_shape=(40,)))
-    model.add(layers.Dense(80, input_dim=input_dim))
+    model.add(layers.Dense(100, input_dim=input_dim))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.25))
     model.add(layers.Dense(100))
-    model.add(layers.Activation('relu'))
+    model.add(layers.Activation('tanh'))
     model.add(layers.Dropout(0.25))
-    # model.add(layers.BatchNormalization())
     model.add(layers.Dense(50))
     model.add(layers.LeakyReLU())
-    model.add(layers.Dense(15))
-    model.add(layers.BatchNormalization())
     model.add(layers.Dropout(0.2))
+    #model.add(layers.BatchNormalization())
+    model.add(layers.Dense(15))
     model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.2))
+    #model.add(layers.BatchNormalization())
     model.add(layers.Dense(6, activation='softmax'))
-    optimizer_sgd = keras.optimizers.SGD(lr=0.003, decay=1e-6, momentum=0.9, nesterov=True)
+    optimizer_sgd = keras.optimizers.SGD(lr=0.002, decay=1e-6, momentum=0.9, nesterov=True)
     optimizer_adam = keras.optimizers.Adam()
     model.compile(loss='categorical_crossentropy', optimizer=optimizer_sgd, metrics=['accuracy'])
     return model
@@ -98,8 +99,9 @@ def extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/tr
     """
     Adapted from https://towardsdatascience.com/music-genre-classification-with-python-c714d032f0d8
     Use librosa to directly extract information from the wavefiles. Requires some music knowledge!
+    if applying to training data set train_mode=False
     """
-    header = 'filename chroma_stft spectral_centroid spectral_bandwidth rolloff zero_crossing_rate'
+    header = 'filename chroma_stft spectral_centroid spectral_bandwidth rolloff zero_crossing_rate rms'
     for i in range(1, 21):
         header += f' mfcc{i}'
     if train_mode:
@@ -109,9 +111,7 @@ def extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/tr
     if train_mode:
         y_df = pd.read_csv('../res/train.csv', header=0, dtype={'new_id':str, 'genre':np.int16})
         y_df = y_df.set_index('new_id')
-    else:
-        row_dict = dict(zip(range(len(audio_files)), map(lambda x: path.splitext(x)[0], audio_files)))
-
+    
     with open(csv_file, 'w') as csv_stream:
         csv_stream.write(header + "\n")
         for i, file_name in enumerate(audio_files):
@@ -124,8 +124,9 @@ def extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/tr
             spec_bw = librosa.feature.spectral_bandwidth(y=y, sr=sr)
             rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
             zcr = librosa.feature.zero_crossing_rate(y)
+            rms = librosa.feature.rms(y)
             mfcc = librosa.feature.mfcc(y=y, sr=sr)
-            to_append = f'{file_name} {np.mean(chroma_stft)} {np.mean(spec_cent)} {np.mean(spec_bw)} {np.mean(rolloff)} {np.mean(zcr)}'    
+            to_append = f'{file_name} {np.mean(chroma_stft)} {np.mean(spec_cent)} {np.mean(spec_bw)} {np.mean(rolloff)} {np.mean(zcr)} {np.mean(rms)}'    
             for e in mfcc:
                 to_append += f' {np.mean(e)}'
             if train_mode:
@@ -133,45 +134,63 @@ def extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/tr
             csv_stream.write(to_append.replace(" ", ",") + "\n")
             if i % 20 == 0:
                 print(i)
-    if not train_mode:
-        with open('test_row_dict_features', 'wb')  as test_file:
-            pickle.dump(row_dict, test_file)
 
-def load_csv_train_model(csv_path):
+
+def load_csv_train_model(csv_path, input_dim=40, do_conf_mat=False):
     """"
     loads a csv of filename, extracted features, label and trains the model on it
+    Will print the confusion matrix if do_conf_mat is True
+    returns the trained model along with the scaler used to standardize the data
     """
     data = pd.read_csv(csv_path)
     print(F"shape of data is {data.shape}")
     data = data.drop(['filename'],axis=1)
     scaler = StandardScaler()
     print('scaling data')
-    X = scaler.fit_transform(np.array(data.iloc[:, :-1], dtype = float))
+    
+    #standardization: we do this so that we can use the same transform for the test set
+    train_data_raw = np.array(data.iloc[:, :-1], dtype=float)
+    scaler = scaler.fit(train_data_raw)
+    X = scaler.transform(train_data_raw)
     genre_list = data.iloc[:, -1]
     encoder = LabelEncoder()
     y = encoder.fit_transform(genre_list)
-    y =keras.utils.to_categorical(y)
     print('done with transforms')
     x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
-    model = build_model(input_dim=25)
-    train_and_eval(model, x_train, y_train, x_eval, y_eval)
-    return model
+    y_onehot_train = keras.utils.to_categorical(y_train)
+    y_onehot_eval = keras.utils.to_categorical(y_eval)
+    model = build_model(input_dim=input_dim)
+    train_and_eval(model, x_train, y_onehot_train, x_eval, y_onehot_eval)
+    
+    if do_conf_mat:
+        from sklearn.metrics import confusion_matrix
+        print('preparing the conf matrix')
+        predictions = model.predict(x_eval)
+        y_pred = [np.argmax(r) for r in predictions.shape[0]]
+        # print a conf matrix and normalize each row!
+        print(confusion_matrix(y_eval, y_pred, normalize=True))
+    
+    return model, scaler
 
-def feature_for_kaggle(train_csv="../res/train_features.csv"):
-    model = load_csv_train_model(train_csv)
-    test_data = pd.read_csv('../res/test_features.csv')
+def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../res/test_features.csv', output_csv='kaggle_feature.csv'):
+    """
+    Trains the model based on the features extracted from the training files
+    and uses them to classify the test set
+    writes the prediction to ./kaggle_features.csv by default
+    """
+    #using the same scaler to transform the test set
+    model, scaler = load_csv_train_model(train_csv, input_dim=26)
+    test_data = pd.read_csv(test_csv)
     file_names = test_data['filename']
     test_data = test_data.drop(['filename'], axis=1)
-    scalar = StandardScaler()
-    x_test = scalar.fit_transform(np.array(test_data, dtype=np.float))
+    x_test = scaler.transform(np.array(test_data, dtype=np.float))
     predictions = model.predict(x_test)
-    with open('kaggle_feature.csv', 'w') as csv_stream:
+    with open(output_csv, 'w') as csv_stream:
         csv_stream.write('id,genre\n')
         for r in range(predictions.shape[0]):
-            predicted_genre = np.argmax(predictions[r,:])
-            file_label,_ = path.splitext(file_names.iloc[r])
+            predicted_genre = np.argmax(predictions[r, :])
+            file_label, _ = path.splitext(file_names.iloc[r])
             csv_stream.write(f"{file_label},{predicted_genre}\n")
-
 
 
 def validate_model():
@@ -181,7 +200,11 @@ def validate_model():
     train_and_eval(model, x_train, y_train, x_eval, y_eval)
 
 # train_for_kaggle()
-#extract_features_build_csv()
-#extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test", csv_file="../res/test_features.csv", train_mode=False)
-# load_csv_train_model('../res/train_features.csv')
-feature_for_kaggle()
+#building the csv for training data
+extract_features_build_csv()
+#building the csv for the test data
+extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test",
+    csv_file="../res/test_features.csv", train_mode=False)
+
+#load_csv_train_model('../res/train_features.csv')
+#predict_kaggle_feature()
