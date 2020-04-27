@@ -11,6 +11,41 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import librosa
 
+def plot_conf_matrix(array_file="../res/conf_matrix.npy", conf_array=None):
+    import matplotlib
+    import matplotlib.pyplot as plt
+
+    if not conf_array:
+        conf_array = np.load(array_file)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(conf_array)
+    labels = "Rock,Pop,Folk,Instr,Elec,HH".split(',')
+    # We want to show all ticks...
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_yticks(np.arange(len(labels)))
+    # ... and label them with the respective list entries
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(labels)):
+        for j in range(len(labels)):
+            text = ax.text(j, i, "%.2f" % conf_array[i, j],ha="center", va="center", color="w")
+
+    ax.set_title("The Confusion Matrix")
+    fig.tight_layout()
+    plt.savefig("../res/confMat_hm.png", bbox_inches='tight', pad_inches=0.3)
+    plt.show()
+
+
+
+
+
 def build_ys():
     """
     This function loads the labels and builds a df 
@@ -224,6 +259,8 @@ def validate_model():
 #extract_features_build_csv()
 #building the csv for the test data
 #extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test", csv_file="../res/test_features.csv", train_mode=False)
+#load_csv_train_model('../res/train_features.csv', do_conf_mat=True, input_dim=26)
+plot_conf_matrix()
+#load_csv_train_model('../res/train_features.csv')
 
-load_csv_train_model('../res/train_features.csv', do_conf_mat=True, input_dim=26)
 #predict_kaggle_feature()
