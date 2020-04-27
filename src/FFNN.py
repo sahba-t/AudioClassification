@@ -43,29 +43,42 @@ def load_x_y(data_file_name='../res/data_pca_ncom40.npy', test_split=0.15):
 
 def build_model(input_dim=40):
     model = keras.models.Sequential()
-    #model.add(layers.BatchNormalization(input_shape=(40,)))
-    model.add(layers.Dense(100, input_dim=input_dim))
+    model.add(layers.BatchNormalization(input_shape=(input_dim,)))
+    model.add(layers.Dense(60, input_dim=input_dim))
     model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.25))
+    model.add(layers.Dropout(0.15))
+    #model.add(layers.BatchNormalization())
+
+    #layer2
     model.add(layers.Dense(100))
-    model.add(layers.Activation('tanh'))
-    model.add(layers.Dropout(0.25))
-    model.add(layers.Dense(50))
+    #model.add(layers.Activation('relu'))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.2))
-    #model.add(layers.BatchNormalization())
+    model.add(layers.BatchNormalization())
+
+    #layer 3
+    model.add(layers.Dense(50))
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.15))
+    model.add(layers.BatchNormalization())
+    
+    #layer 4
+    #model.add(layers.Dense(15, activation='relu'))
     model.add(layers.Dense(15))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.2))
-    #model.add(layers.BatchNormalization())
+    model.add(layers.BatchNormalization())
+
+    #output layer
     model.add(layers.Dense(6, activation='softmax'))
-    optimizer_sgd = keras.optimizers.SGD(lr=0.002, decay=1e-6, momentum=0.9, nesterov=True)
+    optimizer_sgd = keras.optimizers.SGD(lr=0.003, decay=1e-6, momentum=0.9, nesterov=True)
     optimizer_adam = keras.optimizers.Adam()
     model.compile(loss='categorical_crossentropy', optimizer=optimizer_sgd, metrics=['accuracy'])
     return model
 
 def train_and_eval(model, x_train, y_train, x_eval, y_eval):
-    history = model.fit(x_train, y_train, epochs=200, batch_size=128, validation_data=(x_eval, y_eval))
+    "given the training and evbaluation data, trains the model"  
+    history = model.fit(x_train, y_train, epochs=250, batch_size=64, validation_data=(x_eval, y_eval))
     score = model.evaluate(x_eval, y_eval)
     print(score)
     return history
@@ -82,7 +95,7 @@ def train_for_kaggle():
     model = build_model()
     
     x_train,x_eval, y_train,y_eval = load_x_y(test_split=0.1)
-    model.fit(x_train, y_train, epochs=300, batch_size=128, validation_data=(x_eval, y_eval))
+    model.fit(x_train, y_train, epochs=300, batch_size=64, validation_data=(x_eval, y_eval))
     x_test, row_dict = load_test_data()
     predictions = model.predict(x_test)
     with open('kaggle.csv', 'w') as csv_stream:
@@ -156,20 +169,27 @@ def load_csv_train_model(csv_path, input_dim=40, do_conf_mat=False):
     encoder = LabelEncoder()
     y = encoder.fit_transform(genre_list)
     print('done with transforms')
-    x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
+    x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.1)
+
+    print(F"\nusing {x_train.shape[0]} training samples\n")
+
     y_onehot_train = keras.utils.to_categorical(y_train)
     y_onehot_eval = keras.utils.to_categorical(y_eval)
-    model = build_model(input_dim=input_dim)
-    train_and_eval(model, x_train, y_onehot_train, x_eval, y_onehot_eval)
     
+    #building the model and training
+    model = build_model(input_dim=input_dim)
+    model.fit(x_train, y_onehot_train, epochs=250, batch_size=64, validation_data=(x_eval, y_onehot_eval))
+    
+    #prepare the confusion matrix if requested
     if do_conf_mat:
         from sklearn.metrics import confusion_matrix
         print('preparing the conf matrix')
         predictions = model.predict(x_eval)
-        y_pred = [np.argmax(r) for r in predictions.shape[0]]
+        y_pred = [np.argmax(predictions[r]) for r in range(predictions.shape[0])]
         # print a conf matrix and normalize each row!
-        print(confusion_matrix(y_eval, y_pred, normalize=True))
-    
+        cmx = confusion_matrix(y_eval, y_pred, normalize='true')
+        print(cmx)
+        np.save('../res/conf_matrix', cmx)
     return model, scaler
 
 def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../res/test_features.csv', output_csv='kaggle_feature.csv'):
@@ -201,10 +221,9 @@ def validate_model():
 
 # train_for_kaggle()
 #building the csv for training data
-extract_features_build_csv()
+#extract_features_build_csv()
 #building the csv for the test data
-extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test",
-    csv_file="../res/test_features.csv", train_mode=False)
+#extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test", csv_file="../res/test_features.csv", train_mode=False)
 
-#load_csv_train_model('../res/train_features.csv')
+load_csv_train_model('../res/train_features.csv', do_conf_mat=True, input_dim=26)
 #predict_kaggle_feature()
