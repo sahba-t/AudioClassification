@@ -149,15 +149,14 @@ def extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/tr
                 print(i)
 
 
-def load_csv_train_model(csv_path, input_dim=40, do_conf_mat=False):
-    """"
-    loads a csv of filename, extracted features, label and trains the model on it
-    Will print the confusion matrix if do_conf_mat is True
-    returns the trained model along with the scaler used to standardize the data
+def load_csv_features(csv_path='../res/train_features.csv', cat_2_num=True):
+    """
+    reads the csv, standardize the data and converts genres to ints
+    returns the standardized features and y as ints representing categories
     """
     data = pd.read_csv(csv_path)
     print(F"shape of data is {data.shape}")
-    data = data.drop(['filename'],axis=1)
+    data = data.drop(['filename'], axis=1)
     scaler = StandardScaler()
     print('scaling data')
     
@@ -166,9 +165,22 @@ def load_csv_train_model(csv_path, input_dim=40, do_conf_mat=False):
     scaler = scaler.fit(train_data_raw)
     X = scaler.transform(train_data_raw)
     genre_list = data.iloc[:, -1]
-    encoder = LabelEncoder()
-    y = encoder.fit_transform(genre_list)
+    if cat_2_num:
+        encoder = LabelEncoder()
+        y = encoder.fit_transform(genre_list)
+    else:
+        y = genre_list
     print('done with transforms')
+    return X, y, scaler
+    
+
+def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
+    """"
+    loads a csv of filename, extracted features, label and trains the model on it
+    Will print the confusion matrix if do_conf_mat is True
+    returns the trained model along with the scaler used to standardize the data
+    """
+    X, y, scaler = load_csv_features(csv_path)
     x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.1)
 
     print(F"\nusing {x_train.shape[0]} training samples\n")
@@ -199,7 +211,7 @@ def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../r
     writes the prediction to ./kaggle_features.csv by default
     """
     #using the same scaler to transform the test set
-    model, scaler = load_csv_train_model(train_csv, input_dim=26)
+    model, scaler = load_csv_train_NN(train_csv, input_dim=26)
     test_data = pd.read_csv(test_csv)
     file_names = test_data['filename']
     test_data = test_data.drop(['filename'], axis=1)
@@ -213,6 +225,20 @@ def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../r
             csv_stream.write(f"{file_label},{predicted_genre}\n")
 
 
+def Dtree_with_Features():
+    from sklearn import tree
+    X, y, _ = load_csv_features(cat_2_num=False)
+    x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
+    clf = tree.DecisionTreeClassifier(max_depth=10)
+    print(F"training the decision tree on {x_train.shape[0]} instances")
+    clf = clf.fit(x_train, y_train)
+    print(F"Decision Tree fit is complete, the depth is {clf.get_depth()}"
+          + "and the score on training set is:")
+    print(clf.score(x_train, y_train))
+    print("and on the eval set:")
+    print(clf.score(x_eval, y_eval))
+    
+    
 def validate_model():
     model = build_model()
     x_train, x_eval, y_train, y_eval = load_x_y()
@@ -225,5 +251,11 @@ def validate_model():
 #building the csv for the test data
 #extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test", csv_file="../res/test_features.csv", train_mode=False)
 
-load_csv_train_model('../res/train_features.csv', do_conf_mat=True, input_dim=26)
+# to test the neural netwok performance on extracted features
+load_csv_train_NN('../res/train_features.csv', do_conf_mat=True, input_dim=26)
+
+#use the NN to output predictions to kaggle
 #predict_kaggle_feature()
+
+#trying the decision tree
+#Dtree_with_Features()
