@@ -65,12 +65,12 @@ def create_CNN(input_shape=None):
     model.add(layers.MaxPool2D(pool_size=3, strides=1))
     model.add(layers.Dropout(0.2))
 
-    # model.add(layers.Conv2D(filters=4,
-    #                         kernel_size=8,
-    #                         activation='relu'))
-    # model.add(layers.BatchNormalization())
-    # model.add(layers.MaxPool2D(pool_size=3, strides=1))
-    # model.add(layers.Dropout(0.15))
+    model.add(layers.Conv2D(filters=4,
+                            kernel_size=(64, 4),
+                            activation='relu'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPool2D(pool_size=3, strides=1))
+    model.add(layers.Dropout(0.15))
 
     model.add(layers.Flatten())
     model.add(layers.Dense(100, activation='relu'))
