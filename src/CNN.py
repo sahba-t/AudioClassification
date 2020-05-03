@@ -102,8 +102,8 @@ if __name__ == '__main__':
 
         model = create_CNN(input_shape=input_shape)
         model.fit(train_set_x, train_set_y,
-                  epochs=7,
-                  batch_size=50,
+                  epochs=15,
+                  # batch_size=50,
                   verbose=1,
                   validation_data=(eval_set_x, eval_set_y),
                   use_multiprocessing=True)
