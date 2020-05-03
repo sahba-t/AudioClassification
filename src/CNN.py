@@ -39,7 +39,15 @@ def read_labels(f_names: list):
 def read_spectrogram(path: str, f_names: list):
     img_data = np.zeros(shape=(len(f_names), expected_spectro_shape[0], expected_spectro_shape[1]))
     for i in range(len(f_names)):
-        img_data[i] = io.imread(path + f_names[i][:-3] + 'png')
+        spectro = io.imread(path + f_names[i][:-3] + 'png')
+
+        if spectro.shape[1] > expected_spectro_shape[1]:
+            spectro = spectro[:, :(expected_spectro_shape[1] - spectro.shape[1])]
+        elif spectro.shape[1] < expected_spectro_shape[1]:
+            padding_matrix_shape = (expected_spectro_shape[0], expected_spectro_shape[1] - spectro.shape[1])
+            spectro = np.hstack((spectro, np.zeros(padding_matrix_shape)))
+
+        img_data[i] = spectro
         if expected_spectro_shape != img_data[i].shape:
             print("index:", i, "has shape", img_data[i].shape)
     print("Spectrogram from", path, "read in! Shape is:", img_data.shape)
@@ -78,7 +86,6 @@ if __name__ == '__main__':
     def main():
         training_x = read_spectrogram(train_spectro_path, train_spectro_names)
         training_labels = read_labels(train_wav_names)
-        # testing_x = read_spectrogram(test_spectro_path, test_spectro_names)
 
         train_size = int(len(training_x) * .8)
         train_set_x = training_x[:train_size]
@@ -108,4 +115,15 @@ if __name__ == '__main__':
         score = model.evaluate(eval_set_x, eval_set_y, verbose=0)
         print('Test loss:', score[0])
         print('Test accuracy:', score[1])
+
+        testing_x = read_spectrogram(test_spectro_path, test_spectro_names)
+        predictions = model.predict(testing_x)
+        with open('../results/CNN_' + str(score[1]) + '.csv', 'w') as csv_stream:
+            csv_stream.write('id,genre\n')
+            for r in range(predictions.shape[0]):
+                predicted_genre = np.argmax(predictions[r, :])
+                file_label = test_wav_names[r][:-4]
+                csv_stream.write(f"{file_label},{predicted_genre}\n")
+        print('File written to:', '../results/CNN_' + str(score[1]) + '.csv')
+
     main()
