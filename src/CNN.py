@@ -48,6 +48,18 @@ def read_spectrogram(path: str, f_names: list):
     return img_data
 
 
+def format_data(data):
+    img_rows = expected_spectro_shape[0]
+    img_cols = expected_spectro_shape[1]
+    if K.image_data_format() == 'channels_first':
+        data_x = data.reshape(data.shape[0], 1, img_rows, img_cols)
+        input_shape = (1, img_rows, img_cols)
+    else:
+        data_x = data.reshape(data.shape[0], img_rows, img_cols, 1)
+        input_shape = (img_rows, img_cols, 1)
+    return data_x, input_shape
+
+
 def create_CNN(input_shape=None):
     model = keras.models.Sequential()
     model.add(layers.Conv2D(filters=8,
@@ -82,22 +94,11 @@ if __name__ == '__main__':
         training_labels = read_labels(train_spectro_names)
 
         train_size = int(len(training_x) * .8)
-        train_set_x = training_x[:train_size]
+
+        train_set_x, input_shape = format_data(training_x[:train_size])
         train_set_y = training_labels[:train_size]
-
-        eval_set_x = training_x[train_size:]
+        eval_set_x, _            = format_data(training_x[train_size:])
         eval_set_y = training_labels[train_size:]
-
-        img_rows = expected_spectro_shape[0]
-        img_cols = expected_spectro_shape[1]
-        if K.image_data_format() == 'channels_first':
-            train_set_x = train_set_x.reshape(train_set_x.shape[0], 1, img_rows, img_cols)
-            eval_set_x = eval_set_x.reshape(eval_set_x.shape[0], 1, img_rows, img_cols)
-            input_shape = (1, img_rows, img_cols)
-        else:
-            train_set_x = train_set_x.reshape(train_set_x.shape[0], img_rows, img_cols, 1)
-            eval_set_x = eval_set_x.reshape(eval_set_x.shape[0], img_rows, img_cols, 1)
-            input_shape = (img_rows, img_cols, 1)
 
         model = create_CNN(input_shape=input_shape)
         model.fit(train_set_x, train_set_y,
@@ -111,6 +112,7 @@ if __name__ == '__main__':
         print('Test accuracy:', score[1])
 
         testing_x = read_spectrogram(test_spectro_path, test_spectro_names)
+        testing_x = format_data(testing_x)
         predictions = model.predict(testing_x)
         with open('../results/CNN_' + str(score[1]) + '.csv', 'w') as csv_stream:
             csv_stream.write('id,genre\n')
