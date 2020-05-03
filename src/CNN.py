@@ -6,21 +6,15 @@ from tensorflow.keras import layers
 from tensorflow.keras import backend as K
 from skimage import io
 
-train_wav_path = '../res/wav/train/'
-test_wav_path = '../res/wav/test/'
 train_spectro_path = '../res/spectrogram/train/'
 test_spectro_path = '../res/spectrogram/test/'
 
-train_wav_names = os.listdir(train_wav_path)
-test_wav_names = os.listdir(test_wav_path)
 train_spectro_names = os.listdir(train_spectro_path)
 test_spectro_names = os.listdir(test_spectro_path)
 
 expected_spectro_shape = (128, 2551)
 num_classes = 6
 
-print("num train wavs:", len(train_wav_names))
-print("num test wavs:", len(test_wav_names))
 print("num train spectros:", len(train_spectro_names))
 print("num test spectros:", len(test_spectro_names))
 print("expected_spectro_shape:", expected_spectro_shape)
@@ -85,7 +79,7 @@ def create_CNN(input_shape=None):
 if __name__ == '__main__':
     def main():
         training_x = read_spectrogram(train_spectro_path, train_spectro_names)
-        training_labels = read_labels(train_wav_names)
+        training_labels = read_labels(train_spectro_names)
 
         train_size = int(len(training_x) * .8)
         train_set_x = training_x[:train_size]
@@ -122,7 +116,7 @@ if __name__ == '__main__':
             csv_stream.write('id,genre\n')
             for r in range(predictions.shape[0]):
                 predicted_genre = np.argmax(predictions[r, :])
-                file_label = test_wav_names[r][:-4]
+                file_label = test_spectro_names[r][:-4]
                 csv_stream.write(f"{file_label},{predicted_genre}\n")
         print('File written to:', '../results/CNN_' + str(score[1]) + '.csv')
 
