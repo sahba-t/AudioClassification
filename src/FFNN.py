@@ -185,12 +185,13 @@ def extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/tr
                 print(i)
 
 
-def load_csv_features(csv_path='../res/train_features.csv', cat_2_num=True):
+def load_csv_features(csv_path='../res/train_features.csv', cat_2_num=True, shuffle=True):
     """
     reads the csv, standardize the data and converts genres to ints
     returns the standardized features and y as ints representing categories
     """
     data = pd.read_csv(csv_path)
+    data = data.sample(frac=1.0)
     print(F"shape of data is {data.shape}")
     data = data.drop(['filename'], axis=1)
     scaler = StandardScaler()
@@ -210,6 +211,30 @@ def load_csv_features(csv_path='../res/train_features.csv', cat_2_num=True):
     return X, y, scaler
     
 
+def nn_cross_val(csv_path, input_dim = 26, folds=5):
+    """
+    cross validation for the neural network based on features
+    adapted from https://machinelearningmastery.com/evaluate-performance-deep-learning-models-keras/
+    """
+    from sklearn.model_selection import StratifiedKFold
+    seed = 17
+    X, y, _ = load_csv_features(csv_path)
+    kfold = StratifiedKFold(n_splits=folds, shuffle=True, random_state=seed)
+    csv_scores = np.zeros(folds)
+    print(f'started {folds}-folds training')
+    print(y.shape)
+    for i,(train, test) in enumerate(kfold.split(X, y)):
+        y_train = keras.utils.to_categorical(y[train])
+        y_test = keras.utils.to_categorical(y[test])
+        model = build_model(input_dim=input_dim)
+        model.fit(X[train], y_train, epochs=150, batch_size=64, verbose=False)
+        result = model.evaluate(X[test], y_test, verbose=False)
+        score = result[-1] * 100
+        print("%s: %.2f%%" % (model.metrics_names[1], score))
+        csv_scores[i] = score
+    print("%.2f%% +- %.2f+-" % (csv_scores.mean(), csv_scores.std()))
+
+
 def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
     """"
     loads a csv of filename, extracted features, label and trains the model on it
@@ -226,7 +251,7 @@ def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
     
     #building the model and training
     model = build_model(input_dim=input_dim)
-    model.fit(x_train, y_onehot_train, epochs=300, batch_size=128, validation_data=(x_eval, y_onehot_eval))
+    model.fit(x_train, y_onehot_train, epochs=300, batch_size=64, validation_data=(x_eval, y_onehot_eval))
     result = model.evaluate(x_eval, y_onehot_eval)
     calc_CI(result[-1], x_eval.shape[0])
     #prepare the confusion matrix if requested
@@ -297,8 +322,8 @@ def validate_model():
 #plot_conf_matrix()
 
 # to test the neural netwok performance on extracted features
-load_csv_train_NN('../res/train_features.csv', do_conf_mat=False, input_dim=26)
-
+#load_csv_train_NN('../res/train_features.csv', do_conf_mat=False, input_dim=26)
+nn_cross_val('../res/train_features.csv')
 #use the NN to output predictions to kaggle
 #predict_kaggle_feature()
 
