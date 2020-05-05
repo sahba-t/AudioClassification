@@ -106,7 +106,7 @@ def create_1D_CNN(input_shape):
     model.add(layers.Dense(num_classes, activation='softmax'))
 
     model.compile(loss=keras.losses.sparse_categorical_crossentropy,
-                  optimizer=keras.optimizers.Adam(),
+                  optimizer=keras.optimizers.SGD(learning_rate=0.01, momentum=.08),
                   metrics=['accuracy'])
 
     return model
@@ -134,6 +134,7 @@ if __name__ == '__main__':
         model.fit(train_set_x, train_set_y,
                   epochs=25,
                   # batch_size=50,
+                  shuffle=False,  # @TODO make true when you fine a high acc on current architecture
                   verbose=1,
                   validation_data=(eval_set_x, eval_set_y),
                   use_multiprocessing=True)
