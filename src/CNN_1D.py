@@ -17,7 +17,7 @@ num_classes = 6
 
 img_rows = expected_spectro_shape[0]
 img_cols = expected_spectro_shape[1]
-    
+
 
 print("num train spectros:", len(train_spectro_names))
 print("num test spectros:", len(test_spectro_names))
@@ -64,19 +64,17 @@ def format_data(data):
     return data_x, input_shape
 
 
-
 def create_CNN_1d(input_shape):
     model = keras.models.Sequential()
-    model.add(layers.Conv1D(16, 5, activation='relu',input_shape=input_shape))
+    model.add(layers.Conv1D(16, 5, activation='relu', input_shape=input_shape))
     model.add(layers.MaxPool1D(2))
     model.add(layers.Dropout(0.2))
-    
+
     model.add(layers.Conv1D(32, 3, activation='relu'))
     model.add(layers.MaxPool1D(2))
     model.add(layers.Dropout(0.2))
     model.add(layers.Flatten())
     model.add(layers.BatchNormalization())
-
 
     model.add(layers.Dense(100, activation='relu'))
     model.add(layers.Dropout(0.2))
@@ -91,32 +89,26 @@ def create_CNN_1d(input_shape):
 
     return model
 
-def create_CNN(input_shape=None):
+
+def create_1D_CNN(input_shape):
     model = keras.models.Sequential()
-    model.add(layers.Conv2D(filters=8,
-                            kernel_size=(128, 4),
-                            activation='relu',
-                            padding='same',
-                            input_shape=input_shape))
+    model.add(layers.Conv1D(8, 16, activation='relu',input_shape=input_shape))
     model.add(layers.BatchNormalization())
-    model.add(layers.MaxPool2D(pool_size=3, strides=1))
+    model.add(layers.MaxPool1D(2))
+
+    model.add(layers.Conv1D(8, 16, activation='relu'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPool1D(2))
     model.add(layers.Dropout(0.2))
-
-    model.add(layers.Conv2D(filters=4,
-                            kernel_size=(64, 4),
-                            activation='relu'))
-
-    model.add(layers.BatchNormalization())
-    model.add(layers.MaxPool2D(pool_size=3, strides=1))
-    model.add(layers.Dropout(0.15))
 
     model.add(layers.Flatten())
     model.add(layers.Dense(100, activation='relu'))
-    model.add(layers.Dropout(0.1))
     model.add(layers.Dense(num_classes, activation='softmax'))
+
     model.compile(loss=keras.losses.sparse_categorical_crossentropy,
-                  optimizer=keras.optimizers.Adadelta(),
+                  optimizer=keras.optimizers.Adam(),
                   metrics=['accuracy'])
+
     return model
 
 
@@ -125,48 +117,41 @@ if __name__ == '__main__':
         training_x = read_spectrogram(train_spectro_path, train_spectro_names)
         training_labels = read_labels(train_spectro_names)
 
-        train_size = int(len(training_x) * .8)
+        train_size = int(len(training_x) * .75)
 
-        train_set_x, input_shape = format_data(training_x[:train_size])
+        train_set_x = training_x[:train_size]
         train_set_y = training_labels[:train_size]
-        eval_set_x, _            = format_data(training_x[train_size:])
+        eval_set_x = training_x[train_size:]
         eval_set_y = training_labels[train_size:]
-        print("\n\n\n")
+        print("\n\n")
         print(training_x.shape)
         print(train_set_y.shape)
         print(eval_set_y.shape)
-        print("\n\n\n")
-        #model = create_CNN(input_shape=input_shape)
-        model = create_CNN_1d(input_shape=(img_rows, img_cols))
-        #model.fit(train_set_x, train_set_y,
-         #         epochs=15,
-                  # batch_size=50,
-          #        verbose=1,
-           #       validation_data=(eval_set_x, eval_set_y),
-            #      use_multiprocessing=True)
-        
+        print("\n\n")
 
-
-        model.fit(training_x[:train_size], train_set_y,
-                  epochs=15,
+        # model = create_CNN_1d(input_shape=(img_rows, img_cols)) # Sahba's
+        model = create_1D_CNN(input_shape=(img_rows, img_cols))  # Mauricio's
+        model.fit(train_set_x, train_set_y,
+                  epochs=25,
                   # batch_size=50,
                   verbose=1,
-                  validation_data=(training_x[train_size:], eval_set_y))
-        
+                  validation_data=(eval_set_x, eval_set_y),
+                  use_multiprocessing=True)
+
         model.summary()
         score = model.evaluate(training_x[train_size:], eval_set_y, verbose=0)
         print('Test loss:', score[0])
         print('Test accuracy:', score[1])
 
-        testing_x = read_spectrogram(test_spectro_path, test_spectro_names)
-        testing_x = format_data(testing_x)
-        predictions = model.predict(testing_x)
-        with open('../results/CNN_' + str(score[1]) + '.csv', 'w') as csv_stream:
-            csv_stream.write('id,genre\n')
-            for r in range(predictions.shape[0]):
-                predicted_genre = np.argmax(predictions[r, :])
-                file_label = test_spectro_names[r][:-4]
-                csv_stream.write(f"{file_label},{predicted_genre}\n")
-        print('File written to:', '../results/CNN_' + str(score[1]) + '.csv')
+        if score[1] > .6:
+            testing_x = read_spectrogram(test_spectro_path, test_spectro_names)
+            predictions = model.predict(testing_x)
+            with open('../results/CNN_' + str(score[1]) + '.csv', 'w') as csv_stream:
+                csv_stream.write('id,genre\n')
+                for r in range(predictions.shape[0]):
+                    predicted_genre = np.argmax(predictions[r, :])
+                    file_label = test_spectro_names[r][:-4]
+                    csv_stream.write(f"{file_label},{predicted_genre}\n")
+            print('File written to:', '../results/CNN_' + str(score[1]) + '.csv')
 
     main()
