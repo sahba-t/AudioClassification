@@ -108,7 +108,7 @@ def build_model(input_dim=40):
     #output layer
     model.add(layers.Dense(6, activation='softmax'))
     optimizer_sgd = keras.optimizers.SGD(lr=0.003, decay=1e-6, momentum=0.9, nesterov=True)
-    optimizer_adam = keras.optimizers.Adam()
+    optimizer_adam = keras.optimizers.Adam(learning_rate=0.003)
     model.compile(loss='categorical_crossentropy', optimizer=optimizer_sgd, metrics=['accuracy'])
     return model
 
@@ -217,7 +217,7 @@ def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
     returns the trained model along with the scaler used to standardize the data
     """
     X, y, scaler = load_csv_features(csv_path)
-    x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.1)
+    x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
 
     print(F"\nusing {x_train.shape[0]} training samples\n")
 
@@ -226,8 +226,9 @@ def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
     
     #building the model and training
     model = build_model(input_dim=input_dim)
-    model.fit(x_train, y_onehot_train, epochs=250, batch_size=64, validation_data=(x_eval, y_onehot_eval))
-    
+    model.fit(x_train, y_onehot_train, epochs=300, batch_size=128, validation_data=(x_eval, y_onehot_eval))
+    result = model.evaluate(x_eval, y_onehot_eval)
+    calc_CI(result[-1], x_eval.shape[0])
     #prepare the confusion matrix if requested
     if do_conf_mat:
         from sklearn.metrics import confusion_matrix
@@ -275,9 +276,12 @@ def Dtree_with_Features():
     print(F"and on the eval set {eval_n} instances:")
     clf_score = clf.score(x_eval, y_eval)
     print(clf_score)
-    print('CI = %.2f' % (math.sqrt(clf_score * (1 - clf_score)/eval_n) * 100))
     
     
+def calc_CI(score, sample_size):
+    print('CI = %.2f' % (math.sqrt(score * (1 - score)/sample_size) * 100))
+
+
 def validate_model():
     model = build_model()
     x_train, x_eval, y_train, y_eval = load_x_y()
@@ -291,13 +295,12 @@ def validate_model():
 #extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test", csv_file="../res/test_features.csv", train_mode=False)
 #load_csv_train_model('../res/train_features.csv', do_conf_mat=True, input_dim=26)
 #plot_conf_matrix()
-#load_csv_train_model('../res/train_features.csv')
 
 # to test the neural netwok performance on extracted features
-#load_csv_train_NN('../res/train_features.csv', do_conf_mat=True, input_dim=26)
+load_csv_train_NN('../res/train_features.csv', do_conf_mat=False, input_dim=26)
 
 #use the NN to output predictions to kaggle
 #predict_kaggle_feature()
 
 #trying the decision tree
-Dtree_with_Features()
+#Dtree_with_Features()
