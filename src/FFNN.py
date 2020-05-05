@@ -10,6 +10,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from tensorflow import keras
 from tensorflow.keras import layers
 import librosa
+import math
 
 def plot_conf_matrix(array_file="../res/conf_matrix.npy", conf_array=None):
     import matplotlib
@@ -264,14 +265,17 @@ def Dtree_with_Features():
     from sklearn import tree
     X, y, _ = load_csv_features(cat_2_num=False)
     x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
-    clf = tree.DecisionTreeClassifier(max_depth=10)
+    clf = tree.DecisionTreeClassifier()
+    eval_n = x_eval.shape[0]
     print(F"training the decision tree on {x_train.shape[0]} instances")
     clf = clf.fit(x_train, y_train)
     print(F"Decision Tree fit is complete, the depth is {clf.get_depth()}"
           + "and the score on training set is:")
     print(clf.score(x_train, y_train))
-    print("and on the eval set:")
-    print(clf.score(x_eval, y_eval))
+    print(F"and on the eval set {eval_n} instances:")
+    clf_score = clf.score(x_eval, y_eval)
+    print(clf_score)
+    print('CI = %.2f' % (math.sqrt(clf_score * (1 - clf_score)/eval_n) * 100))
     
     
 def validate_model():
@@ -286,11 +290,11 @@ def validate_model():
 #building the csv for the test data
 #extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/test", csv_file="../res/test_features.csv", train_mode=False)
 #load_csv_train_model('../res/train_features.csv', do_conf_mat=True, input_dim=26)
-plot_conf_matrix()
+#plot_conf_matrix()
 #load_csv_train_model('../res/train_features.csv')
 
 # to test the neural netwok performance on extracted features
-load_csv_train_NN('../res/train_features.csv', do_conf_mat=True, input_dim=26)
+#load_csv_train_NN('../res/train_features.csv', do_conf_mat=True, input_dim=26)
 
 #use the NN to output predictions to kaggle
 #predict_kaggle_feature()
