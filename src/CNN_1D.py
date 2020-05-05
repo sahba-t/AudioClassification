@@ -92,11 +92,11 @@ def create_CNN_1d(input_shape):
 
 def create_1D_CNN(input_shape):
     model = keras.models.Sequential()
-    model.add(layers.Conv1D(8, 16, activation='relu',input_shape=input_shape))
+    model.add(layers.Conv1D(filters=8, kernel_size=16, activation='relu',input_shape=input_shape))
     model.add(layers.BatchNormalization())
     model.add(layers.MaxPool1D(2))
 
-    model.add(layers.Conv1D(8, 16, activation='relu'))
+    model.add(layers.Conv1D(filters=8, kernel_size=16, activation='relu'))
     model.add(layers.BatchNormalization())
     model.add(layers.MaxPool1D(2))
     model.add(layers.Dropout(0.2))
@@ -106,7 +106,7 @@ def create_1D_CNN(input_shape):
     model.add(layers.Dense(num_classes, activation='softmax'))
 
     model.compile(loss=keras.losses.sparse_categorical_crossentropy,
-                  optimizer=keras.optimizers.SGD(learning_rate=0.01, momentum=.08),
+                  optimizer=keras.optimizers.SGD(learning_rate=0.01, momentum=.09),
                   metrics=['accuracy'])
 
     return model
