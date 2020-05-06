@@ -13,6 +13,11 @@ import librosa
 import math
 
 def plot_conf_matrix(array_file="../res/conf_matrix.npy", conf_array=None):
+    """
+    given a confusion matrix as a numpy array (either saved on disk or actual array)
+    plot the confusion matrix as a heatmap
+    saves the heatmap in the res folder
+    """
     import matplotlib
     import matplotlib.pyplot as plt
 
@@ -49,7 +54,11 @@ def plot_conf_matrix(array_file="../res/conf_matrix.npy", conf_array=None):
 
 def build_ys():
     """
-    This function loads the labels and builds a df 
+    This function loads the labels for the training data and 
+    returns the classes of each training datapoint
+    used for classification witht the PCA data
+    @returns a numpy array where the value at index `i` corresponds to the 
+    genre of training sample i  
     """
     y_df = pd.read_csv('../res/train.csv', header=0, dtype={'new_id':str, 'genre':np.int16})
     y_df = y_df.set_index('new_id')
@@ -87,7 +96,6 @@ def build_model(input_dim=40):
 
     #layer2
     model.add(layers.Dense(100))
-    #model.add(layers.Activation('relu'))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.2))
     model.add(layers.BatchNormalization())
@@ -149,6 +157,9 @@ def extract_features_build_csv(folder_path="/users/sahba/scratch/git/project3/tr
     Adapted from https://towardsdatascience.com/music-genre-classification-with-python-c714d032f0d8
     Use librosa to directly extract information from the wavefiles. Requires some music knowledge!
     if applying to training data set train_mode=False
+    @param folder_path(str): the path of the training wav files
+    @param csv_file(str): the path of the csv file to output the features
+    @paream train_mode(boolean): if True, the labels will be appended to the csv file 
     """
     header = 'filename chroma_stft spectral_centroid spectral_bandwidth rolloff zero_crossing_rate rms'
     for i in range(1, 21):
@@ -214,7 +225,8 @@ def load_csv_features(csv_path='../res/train_features.csv', cat_2_num=True, shuf
 def nn_cross_val(csv_path, input_dim = 26, folds=5):
     """
     cross validation for the neural network based on features
-    adapted from https://machinelearningmastery.com/evaluate-performance-deep-learning-models-keras/
+    adapted from:
+    https://machinelearningmastery.com/evaluate-performance-deep-learning-models-keras/
     """
     from sklearn.model_selection import StratifiedKFold
     seed = 17
@@ -232,7 +244,7 @@ def nn_cross_val(csv_path, input_dim = 26, folds=5):
         score = result[-1] * 100
         print("%s: %.2f%%" % (model.metrics_names[1], score))
         csv_scores[i] = score
-    print("%.2f%% +- %.2f+-" % (csv_scores.mean(), csv_scores.std()))
+    print("average: %.2f%% +- %.2f%%" % (csv_scores.mean(), csv_scores.std()))
 
 
 def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
@@ -304,14 +316,17 @@ def Dtree_with_Features():
     
     
 def calc_CI(score, sample_size):
-    print('CI = %.2f' % (math.sqrt(score * (1 - score)/sample_size) * 100))
+    """
+    Calculate and prints the confidence interval given the score and the size of the evaluation set
+    resulted in that accuracy
+    @param score(float)
+    @param sample_size (int)
+    @return the confidence interval
+    """
+    CI = math.sqrt(score * (1 - score)/sample_size) * 100
+    print('CI = %.2f' % CI)
+    return CI
 
-
-def validate_model():
-    model = build_model()
-    x_train, x_eval, y_train, y_eval = load_x_y()
-    print(y_train)
-    train_and_eval(model, x_train, y_train, x_eval, y_eval)
 
 # train_for_kaggle()
 #building the csv for training data
