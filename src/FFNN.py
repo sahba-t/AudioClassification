@@ -72,13 +72,18 @@ def build_ys():
     np.save('../res/training_labels', training_labels)
     return training_labels
 
-def load_x_y(data_file_name='../res/data_pca_ncom40.npy', test_split=0.15):
+def load_x_y(data_file_name, test_split=0.20, convert_2_cat=True):
+    """
+    loads the training data that has been reduced by pca 
+    returns the training data and labels
+    """
     xs = np.load(data_file_name)
     ys = np.load('../res/training_labels.npy')
     print(ys.shape)
     print(xs.shape)
     #converting to categorical
-    ys = keras.utils.to_categorical(ys)
+    if convert_2_cat:
+        ys = keras.utils.to_categorical(ys)
 
     if test_split > 0:
         x_t, x_test, y_t, y_test = train_test_split(xs, ys, test_size=test_split, shuffle=True)
@@ -86,7 +91,7 @@ def load_x_y(data_file_name='../res/data_pca_ncom40.npy', test_split=0.15):
     else:
         return xs, ys
 
-def build_model(input_dim=40):
+def build_model(input_dim=40, loss='categorical_crossentropy'):
     model = keras.models.Sequential()
     model.add(layers.BatchNormalization(input_shape=(input_dim,)))
     model.add(layers.Dense(60, input_dim=input_dim))
@@ -117,14 +122,40 @@ def build_model(input_dim=40):
     model.add(layers.Dense(6, activation='softmax'))
     optimizer_sgd = keras.optimizers.SGD(lr=0.003, decay=1e-6, momentum=0.9, nesterov=True)
     optimizer_adam = keras.optimizers.Adam(learning_rate=0.003)
-    model.compile(loss='categorical_crossentropy', optimizer=optimizer_sgd, metrics=['accuracy'])
+    model.compile(loss=loss, optimizer=optimizer_sgd, metrics=['accuracy'])
     return model
 
-def train_and_eval(model, x_train, y_train, x_eval, y_eval):
+def nn_with_pca(pca_array='../res/data_pca_40.npy', num_comp=40, do_conf_mat=False, do_kfold=0):       
+    if do_kfold > 1:
+        from sklearn.model_selection import StratifiedKFold
+        seed = 17
+        kfold = StratifiedKFold(n_splits=do_kfold, shuffle=True, random_state=seed)
+        csv_scores = np.zeros(do_kfold)
+        X = np.load(pca_array)
+        y = np.load('../res/training_labels.npy')
+        print(f'started {do_kfold}-folds validation. keeping {len(X)} for evaluation')
+        for i,(train, test) in enumerate(kfold.split(X, y)):
+            y_train = keras.utils.to_categorical(y[train])
+            y_test = keras.utils.to_categorical(y[test])
+            model = build_model(input_dim=num_comp)
+            model.fit(X[train], y_train, epochs=100, batch_size=64, verbose=False)
+            result = model.evaluate(X[test], y_test, verbose=False)
+            score = result[-1] * 100
+            print("%s: %.2f%%" % (model.metrics_names[1], score))
+            csv_scores[i] = score
+        print("average: %.2f%% +- %.2f%%" % (csv_scores.mean(), csv_scores.std()))
+
+    x_train, x_eval, y_train, y_eval = load_x_y(pca_array, 0.2)
+    model = build_model(input_dim=num_comp)
     "given the training and evbaluation data, trains the model"  
-    history = model.fit(x_train, y_train, epochs=250, batch_size=64, validation_data=(x_eval, y_eval))
-    score = model.evaluate(x_eval, y_eval)
-    print(score)
+    history = model.fit(x_train, y_train, epochs=100, batch_size=64)
+    score = model.evaluate(x_eval, y_eval)[-1]
+    calc_CI(score, x_eval.shape[0])
+    cat_2_num = lambda x: [np.argmax(r) for r in x]
+    if do_conf_mat:
+        build_conf_matrix(model, x_eval, y_eval, F'../res/pca_cm_{str(num_comp)}', cat_2_num, cat_2_num)
+
+
     return history
 
 
@@ -278,6 +309,30 @@ def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
         np.save('../res/conf_matrix', cmx)
     return model, scaler
 
+
+def build_conf_matrix(model, x_eval, y_eval, output_file, fn_on_preds=None, fn_on_yeval=None):
+    """
+    given a model and and evaluation set generates the confusion matrix
+    if needed a function can be passed to be applied to the result of prediction
+    (such as interperating the result of one-hot-enocded results)
+    saveds the confusion matrix to disk and also returns the matrix
+    """
+    from sklearn.metrics import confusion_matrix
+    print('preparing the conf matrix')
+    predictions = model.predict(x_eval)
+    if fn_on_preds:
+        y_pred = fn_on_preds(predictions)
+    else:
+        y_pred = predictions
+    if fn_on_yeval:
+        y_eval = fn_on_yeval(y_eval)
+    # print a conf matrix and normalize each row!
+    cmx = confusion_matrix(y_eval, y_pred, normalize='true')
+    print(cmx)
+    print('saving cmx to' + str(output_file))
+    np.save(output_file, cmx)
+    return cmx
+
 def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../res/test_features.csv', output_csv='kaggle_feature.csv'):
     """
     Trains the model based on the features extracted from the training files
@@ -299,11 +354,11 @@ def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../r
             csv_stream.write(f"{file_label},{predicted_genre}\n")
 
 
-def Dtree_with_Features():
+def Dtree_with_Features(do_conf_mat=False, max_depth=None):
     from sklearn import tree
     X, y, _ = load_csv_features(cat_2_num=False)
     x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
-    clf = tree.DecisionTreeClassifier()
+    clf = tree.DecisionTreeClassifier(max_depth=max_depth)
     eval_n = x_eval.shape[0]
     print(F"training the decision tree on {x_train.shape[0]} instances")
     clf = clf.fit(x_train, y_train)
@@ -312,8 +367,10 @@ def Dtree_with_Features():
     print(clf.score(x_train, y_train))
     print(F"and on the eval set {eval_n} instances:")
     clf_score = clf.score(x_eval, y_eval)
-    print(clf_score)
-    
+    calc_CI(clf_score, x_eval.shape[0])
+    if do_conf_mat:
+        build_conf_matrix(clf, x_eval, y_eval, F'../res/dt_cm_{str(max_depth)}')
+    return clf_score
     
 def calc_CI(score, sample_size):
     """
@@ -338,9 +395,14 @@ def calc_CI(score, sample_size):
 
 # to test the neural netwok performance on extracted features
 #load_csv_train_NN('../res/train_features.csv', do_conf_mat=False, input_dim=26)
-nn_cross_val('../res/train_features.csv')
+
+#cross validation neural network features
+# nn_cross_val('../res/train_features.csv')
+
 #use the NN to output predictions to kaggle
 #predict_kaggle_feature()
 
 #trying the decision tree
 #Dtree_with_Features()
+nn_with_pca(do_conf_mat=True, do_kfold=5)
+
