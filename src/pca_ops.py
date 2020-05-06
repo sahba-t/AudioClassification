@@ -7,7 +7,7 @@ import os
 import numpy as np
 import datetime 
 def load_data(save=False):
-    train_dir = 'train/'
+    train_dir = '/users/sahba/scratch/git/project3/train/'
     file_names = os.listdir(train_dir)
     training_data = np.zeros((len(file_names) ,1439471))
     #for i,file in enumerate(files_names):
@@ -32,7 +32,7 @@ def do_pca(training_data, kwargs):
     pca = PCA(**kwargs)
     pca.fit(training_data)
     print(pca)
-    with open("./pca_pickled_mle", 'wb') as pca_file:
+    with open("./pca_pickled_80", 'wb') as pca_file:
         pickle.dump(pca, pca_file)
 
 
@@ -56,6 +56,7 @@ def transform_data(pca, data, save=True, file_name='pcad_data'):
 if __name__ == '__main__':
     training_data = load_data()
     # print('now pca')
-    # do_pca(training_data, {'n_components':'mle', 'svd_solver':'full'})
-    pca = load_pca('pca_pickled')
-    transform_data(pca, training_data, file_name='data_PCA10')
+    training_data = load_data()
+    do_pca(training_data, {'n_components':80})
+    #pca = load_pca('pca_pickled')
+    #transform_data(pca, training_data, file_name='data_PCA10')
