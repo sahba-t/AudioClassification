@@ -1,7 +1,7 @@
 # AudioClassification
-CS 529 Spring 20, Project 3 (Audio categorization)
-Mmembers: Sahba Tashakkori, Mauricio Monisivaise 
-Team name on Kaggle: Team GPGPU
+CS 529 Spring 20, Project 3 (Audio categorization)<br>
+Mmembers: Sahba Tashakkori, Mauricio Monisivaise <br>
+Team name on Kaggle: Team GPGPU<br>
 ## Folder Structure
 <ul>
   <li> src: All the source code for the project</li>
