@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 import os
 from os import path
-import numpy as np
-import sklearn
 import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -159,19 +157,19 @@ def nn_with_pca(pca_array='../res/pca/data_pca_40.npy', num_comp=40, do_conf_mat
     return history
 
 
-def load_test_data(test_data_file_name='../res/test_pca_ncom40.npy', row_dict_name='../res/test_row_dict'):
+def load_test_data_pca(test_data_file_name='../res/test_pca_ncom40.npy', row_dict_name='../res/test_row_dict'):
     with open(row_dict_name, 'rb') as p_file:
         row_dict= pickle.load(p_file)
 
     eval_xs = np.load(test_data_file_name)
     return eval_xs, row_dict
 
-def train_for_kaggle():
+def train_for_kaggle_pca():
     model = build_model()
     
-    x_train,x_eval, y_train,y_eval = load_x_y(test_split=0.1)
+    x_train,x_eval, y_train,y_eval = load_x_y('../res/pca/data_pca_40.npy', test_split=0.1)
     model.fit(x_train, y_train, epochs=300, batch_size=64, validation_data=(x_eval, y_eval))
-    x_test, row_dict = load_test_data()
+    x_test, row_dict = load_test_data_pca()
     predictions = model.predict(x_test)
     with open('kaggle.csv', 'w') as csv_stream:
         csv_stream.write('id,genre\n')
@@ -354,7 +352,7 @@ def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../r
             csv_stream.write(f"{file_label},{predicted_genre}\n")
 
 
-def Dtree_with_Features(do_conf_mat=False, max_depth=None, data_type='FEATURES',
+def DTree_Implementation(do_conf_mat=False, max_depth=None, data_type='FEATURES',
                         pca_array='../res/pca/data_pca_40.npy', plot_cm=False):
     """
     Performs decision tree classifier with either pca data or domain specific data
@@ -403,7 +401,7 @@ def calc_CI(score, sample_size):
     return CI
 
 
-# train_for_kaggle()
+# train_for_kaggle_pca()
 #building the csv for training data
 #extract_features_build_csv()
 #building the csv for the test data
@@ -421,7 +419,7 @@ def calc_CI(score, sample_size):
 #predict_kaggle_feature()
 
 #trying the decision tree
-Dtree_with_Features(max_depth=10, do_conf_mat=True, plot_cm=True, data_type="PCA")
+DTree_Implementation(max_depth=10, do_conf_mat=True, plot_cm=True, data_type="PCA")
 # nn_with_pca(do_conf_mat=True, do_kfold=5)
 
 #plotting confusion matrix
