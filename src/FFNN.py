@@ -12,7 +12,7 @@ from tensorflow.keras import layers
 import librosa
 import math
 
-def plot_conf_matrix(array_file="../res/conf_matrix.npy", conf_array=None):
+def plot_conf_matrix(array_file="../res/confMat/conf_matrix.npy", conf_array=None, out_file_name="cm.png"):
     """
     given a confusion matrix as a numpy array (either saved on disk or actual array)
     plot the confusion matrix as a heatmap
@@ -45,7 +45,7 @@ def plot_conf_matrix(array_file="../res/conf_matrix.npy", conf_array=None):
 
     ax.set_title("The Confusion Matrix")
     fig.tight_layout()
-    plt.savefig("../res/confMat_hm.png", bbox_inches='tight', pad_inches=0.3)
+    plt.savefig("../res/confMat/" + out_file_name, bbox_inches='tight', pad_inches=0.3)
     plt.show()
 
 
@@ -125,7 +125,7 @@ def build_model(input_dim=40, loss='categorical_crossentropy'):
     model.compile(loss=loss, optimizer=optimizer_sgd, metrics=['accuracy'])
     return model
 
-def nn_with_pca(pca_array='../res/data_pca_40.npy', num_comp=40, do_conf_mat=False, do_kfold=0):       
+def nn_with_pca(pca_array='../res/pca/data_pca_40.npy', num_comp=40, do_conf_mat=False, do_kfold=0):       
     if do_kfold > 1:
         from sklearn.model_selection import StratifiedKFold
         seed = 17
@@ -354,10 +354,23 @@ def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../r
             csv_stream.write(f"{file_label},{predicted_genre}\n")
 
 
-def Dtree_with_Features(do_conf_mat=False, max_depth=None):
+def Dtree_with_Features(do_conf_mat=False, max_depth=None, data_type='FEATURES',
+                        pca_array='../res/pca/data_pca_40.npy', plot_cm=False):
+    """
+    Performs decision tree classifier with either pca data or domain specific data
+    can generate confusion matrix
+    """
+    
+    
     from sklearn import tree
-    X, y, _ = load_csv_features(cat_2_num=False)
-    x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
+    if data_type.upper() == 'FEATURES':
+        X, y, _ = load_csv_features(cat_2_num=False)
+        x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
+    elif data_type.upper() == 'PCA':
+        x_train, x_eval, y_train, y_eval = load_x_y(pca_array, test_split=0.20, convert_2_cat=False)
+
+    else:
+        print("ERROR: unsupported data representation " + data_type)
     clf = tree.DecisionTreeClassifier(max_depth=max_depth)
     eval_n = x_eval.shape[0]
     print(F"training the decision tree on {x_train.shape[0]} instances")
@@ -369,9 +382,14 @@ def Dtree_with_Features(do_conf_mat=False, max_depth=None):
     clf_score = clf.score(x_eval, y_eval)
     calc_CI(clf_score, x_eval.shape[0])
     if do_conf_mat:
-        build_conf_matrix(clf, x_eval, y_eval, F'../res/dt_cm_{str(max_depth)}')
+        array_dst = F'../res/confMat/dt_cm_{str(max_depth)}'
+        build_conf_matrix(clf, x_eval, y_eval, array_dst)
+        if plot_cm:
+            plot_conf_matrix(array_file=array_dst + ".npy", conf_array=None, out_file_name=F"dt_cm_{str(max_depth)}" + ".png")
+            
     return clf_score
     
+
 def calc_CI(score, sample_size):
     """
     Calculate and prints the confidence interval given the score and the size of the evaluation set
@@ -381,7 +399,7 @@ def calc_CI(score, sample_size):
     @return the confidence interval
     """
     CI = math.sqrt(score * (1 - score)/sample_size) * 100
-    print('CI = %.2f' % CI)
+    print('Score: %.2f +- CI = %.2f' % (score, CI))
     return CI
 
 
@@ -403,6 +421,8 @@ def calc_CI(score, sample_size):
 #predict_kaggle_feature()
 
 #trying the decision tree
-#Dtree_with_Features()
-nn_with_pca(do_conf_mat=True, do_kfold=5)
+Dtree_with_Features(max_depth=10, do_conf_mat=True, plot_cm=True, data_type="PCA")
+# nn_with_pca(do_conf_mat=True, do_kfold=5)
 
+#plotting confusion matrix
+#plot_conf_matrix(array_file='../res/confMat/pca_cm_40.npy', out_file_name="pca_40_cm.png")
