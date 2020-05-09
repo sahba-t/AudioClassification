@@ -7,6 +7,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import backend as K
 from skimage import io
+from sklearn import metrics
 from random import shuffle
 
 train_spectro_path = '../res/spectrogram/train/'
@@ -26,9 +27,9 @@ print("num test spectros:", len(test_spectro_names))
 print("expected_spectro_shape:", expected_spectro_shape)
 
 
-def plot_conf_matrix(conf_array=None):
+def plot_conf_matrix(acc, conf_array):
     fig, ax = plt.subplots()
-    im = ax.imshow(conf_array)
+    ax.imshow(conf_array)
     labels = "Rock,Pop,Folk,Instr,Elec,HH".split(',')
     # We want to show all ticks...
     ax.set_xticks(np.arange(len(labels)))
@@ -43,11 +44,11 @@ def plot_conf_matrix(conf_array=None):
     # Loop over data dimensions and create text annotations.
     for i in range(len(labels)):
         for j in range(len(labels)):
-            text = ax.text(j, i, "%.2f" % conf_array[i, j], ha="center", va="center", color="w")
+            ax.text(j, i, "%.2f" % conf_array[i, j], ha="center", va="center", color="w")
 
     ax.set_title("The Confusion Matrix")
     fig.tight_layout()
-    plt.savefig("../res/confMat_cnn.png", bbox_inches='tight', pad_inches=0.3)
+    plt.savefig("../res/confMat_cnn_acc" + str(acc) + ".png", bbox_inches='tight', pad_inches=0.3)
     plt.show()
 
 
@@ -93,11 +94,13 @@ def format_data(data):
 
 def create_1D_CNN(input_shape):
     model = keras.models.Sequential()
-    model.add(layers.Conv1D(filters=8, kernel_size=16, activation='relu', input_shape=input_shape))
+    # model.add(layers.Conv1D(filters=4, kernel_size=8, activation='relu', input_shape=input_shape))
+    model.add(layers.Conv1D(filters=8, kernel_size=16, activation='relu'))
     model.add(layers.BatchNormalization())
     model.add(layers.MaxPool1D(2))
 
     model.add(layers.Conv1D(filters=8, kernel_size=16, activation='relu'))
+    # model.add(layers.Conv1D(filters=8, kernel_size=32, activation='relu'))
     model.add(layers.BatchNormalization())
     model.add(layers.MaxPool1D(2))
     model.add(layers.Dropout(0.2))
@@ -155,6 +158,12 @@ if __name__ == '__main__':
         score = model.evaluate(training_x[train_size:], eval_set_y, verbose=0)
         print('Test loss:', score[0])
         print('Test accuracy:', score[1])
+
+        predictions = model.predict(eval_set_x)
+        matrix = metrics.confusion_matrix(eval_set_y, predictions.argmax(axis=1))
+        print(matrix)
+        plot_conf_matrix(score[1], matrix)
+        calc_CI(score=score[1], sample_size=len(eval_set_y))
 
         if score[1] > .6:
             testing_x = read_spectrogram(test_spectro_path, test_spectro_names)
