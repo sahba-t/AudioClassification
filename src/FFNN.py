@@ -101,13 +101,13 @@ def build_model(input_dim=40, loss='categorical_crossentropy'):
     model.add(layers.Dense(100))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.2))
-    model.add(layers.BatchNormalization())
+    #model.add(layers.BatchNormalization())
 
     #layer 3
     model.add(layers.Dense(50))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.15))
-    model.add(layers.BatchNormalization())
+    #model.add(layers.BatchNormalization())
     
     #layer 4
     #model.add(layers.Dense(15, activation='relu'))
@@ -251,7 +251,7 @@ def load_csv_features(csv_path='../res/train_features.csv', cat_2_num=True, shuf
     return X, y, scaler
     
 
-def nn_cross_val(csv_path, input_dim = 26, folds=5):
+def nn_cross_val(csv_path='../res/train_features.csv', input_dim = 26, folds=5, save_models=False):
     """
     cross validation for the neural network based on features
     adapted from:
@@ -259,22 +259,28 @@ def nn_cross_val(csv_path, input_dim = 26, folds=5):
     """
     from sklearn.model_selection import StratifiedKFold
     seed = 17
-    X, y, _ = load_csv_features(csv_path)
+    X, y, scaler = load_csv_features(csv_path)
     kfold = StratifiedKFold(n_splits=folds, shuffle=True, random_state=seed)
     csv_scores = np.zeros(folds)
     print(f'started {folds}-folds training')
     print(y.shape)
+    models = None 
+    if save_models:
+        models = [None] * folds
+
     for i,(train, test) in enumerate(kfold.split(X, y)):
         y_train = keras.utils.to_categorical(y[train])
         y_test = keras.utils.to_categorical(y[test])
         model = build_model(input_dim=input_dim)
-        model.fit(X[train], y_train, epochs=150, batch_size=64, verbose=False)
+        model.fit(X[train], y_train, epochs=200, batch_size=64, verbose=False)
         result = model.evaluate(X[test], y_test, verbose=False)
         score = result[-1] * 100
         print("%s: %.2f%%" % (model.metrics_names[1], score))
         csv_scores[i] = score
+        if save_models:
+            models[i] = model
     print("average: %.2f%% +- %.2f%%" % (csv_scores.mean(), csv_scores.std()))
-
+    return models, scaler
 
 def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
     """"
@@ -344,6 +350,8 @@ def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../r
     test_data = test_data.drop(['filename'], axis=1)
     x_test = scaler.transform(np.array(test_data, dtype=np.float))
     predictions = model.predict(x_test)
+    print("!!!!! ATTENTION THE SHAPE IS:")
+    print(predictions.shape)
     with open(output_csv, 'w') as csv_stream:
         csv_stream.write('id,genre\n')
         for r in range(predictions.shape[0]):
@@ -351,6 +359,38 @@ def predict_kaggle_feature(train_csv="../res/train_features.csv", test_csv='../r
             file_label, _ = path.splitext(file_names.iloc[r])
             csv_stream.write(f"{file_label},{predicted_genre}\n")
 
+def ensemble_for_kaggle(output_csv='kaggle_ensemble.csv'):
+    from sklearn import tree
+    dt_count = 5
+    dt_models = []
+    models, scaler = nn_cross_val(save_models=True)
+    for i in range(dt_count):
+        X, y,_ = load_csv_features(cat_2_num=False)
+        x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
+        clf = tree.DecisionTreeClassifier(max_depth=8)
+        clf = clf.fit(x_train, y_train)
+        dt_models.append(clf)
+    test_data = pd.read_csv('../res/test_features.csv')
+    file_names = test_data['filename']
+    test_data = test_data.drop(['filename'], axis=1)
+    x_test = scaler.transform(np.array(test_data, dtype=np.float))
+    predictions = [model.predict(x_test) for model in models]
+    dt_predictions = [model.predict(x_test) for model in dt_models]
+    number_of_test_cases = predictions[0].shape[0]
+    with open(output_csv, 'w') as csv_stream:
+        csv_stream.write('id,genre\n')
+        for test_case in range(number_of_test_cases):
+            votes = np.zeros(6, dtype=np.int16)
+            for nn_prediction in predictions:
+                    predicted_genre = np.argmax(nn_prediction[test_case, :])
+                    votes[predicted_genre] += 1
+            for dt_prediction in dt_predictions:
+                votes[dt_prediction[test_case]] += 1
+            voted_genre = np.argmax(votes)
+            print("genre %d selected with %d votes" % (voted_genre, votes[voted_genre]))
+            file_label, _ = path.splitext(file_names.iloc[test_case])
+            csv_stream.write(f"{file_label},{voted_genre}\n")
+    
 
 def DTree_Implementation(do_conf_mat=False, max_depth=None, data_type='FEATURES',
                         pca_array='../res/pca/data_pca_40.npy', plot_cm=False):
@@ -366,7 +406,7 @@ def DTree_Implementation(do_conf_mat=False, max_depth=None, data_type='FEATURES'
         x_train, x_eval, y_train, y_eval = train_test_split(X, y, test_size=0.2)
     elif data_type.upper() == 'PCA':
         x_train, x_eval, y_train, y_eval = load_x_y(pca_array, test_split=0.20, convert_2_cat=False)
-
+        clf = clf.fit(x_train, y_train)
     else:
         print("ERROR: unsupported data representation " + data_type)
     clf = tree.DecisionTreeClassifier(max_depth=max_depth)
@@ -419,8 +459,9 @@ def calc_CI(score, sample_size):
 #predict_kaggle_feature()
 
 #trying the decision tree
-DTree_Implementation(max_depth=10, do_conf_mat=True, plot_cm=True, data_type="PCA")
+# DTree_Implementation(max_depth=10, do_conf_mat=True, plot_cm=True, data_type="PCA")
 # nn_with_pca(do_conf_mat=True, do_kfold=5)
 
 #plotting confusion matrix
 #plot_conf_matrix(array_file='../res/confMat/pca_cm_40.npy', out_file_name="pca_40_cm.png")
+ensemble_for_kaggle()
