@@ -282,7 +282,7 @@ def nn_cross_val(csv_path='../res/train_features.csv', input_dim = 26, folds=5, 
     print("average: %.2f%% +- %.2f%%" % (csv_scores.mean(), csv_scores.std()))
     return models, scaler
 
-def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
+def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False, plot_training=False):
     """"
     loads a csv of filename, extracted features, label and trains the model on it
     Will print the confusion matrix if do_conf_mat is True
@@ -298,7 +298,7 @@ def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
     
     #building the model and training
     model = build_model(input_dim=input_dim)
-    model.fit(x_train, y_onehot_train, epochs=300, batch_size=64, validation_data=(x_eval, y_onehot_eval))
+    history = model.fit(x_train, y_onehot_train, epochs=200, batch_size=64, validation_data=(x_eval, y_onehot_eval))
     result = model.evaluate(x_eval, y_onehot_eval)
     calc_CI(result[-1], x_eval.shape[0])
     #prepare the confusion matrix if requested
@@ -311,6 +311,27 @@ def load_csv_train_NN(csv_path, input_dim=40, do_conf_mat=False):
         cmx = confusion_matrix(y_eval, y_pred, normalize='true')
         print(cmx)
         np.save('../res/conf_matrix', cmx)
+    if plot_training:
+        import matplotlib
+        import matplotlib.pyplot as plt
+        matplotlib.rcParams.update({'font.size': 14})
+        plt.plot(history.history['accuracy'], linewidth=3)
+        plt.plot(history.history['val_accuracy'], linewidth=3)
+        plt.title('Model Accuracy')
+        plt.ylabel('Accuracy')
+        plt.xlabel('Epoch')
+        plt.legend(['training', 'evaluation'], loc='upper left')
+        plt.savefig("../res/train_acc.png",  bbox_inches='tight', pad_inches=0.3)
+        plt.figure()
+        # summarize history for loss
+        plt.plot(history.history['loss'], linewidth=3)
+        plt.plot(history.history['val_loss'], linewidth=3)
+        plt.title('Model Loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.legend(['training', 'evaluation'], loc='upper left')
+        plt.savefig("../res/train_loss.png",  bbox_inches='tight', pad_inches=0.3)
+        plt.show()
     return model, scaler
 
 
@@ -450,7 +471,7 @@ def calc_CI(score, sample_size):
 #plot_conf_matrix()
 
 # to test the neural netwok performance on extracted features
-#load_csv_train_NN('../res/train_features.csv', do_conf_mat=False, input_dim=26)
+load_csv_train_NN('../res/train_features.csv', do_conf_mat=False, input_dim=26, plot_training=True)
 
 #cross validation neural network features
 # nn_cross_val('../res/train_features.csv')
@@ -464,4 +485,4 @@ def calc_CI(score, sample_size):
 
 #plotting confusion matrix
 #plot_conf_matrix(array_file='../res/confMat/pca_cm_40.npy', out_file_name="pca_40_cm.png")
-ensemble_for_kaggle()
+# ensemble_for_kaggle()
