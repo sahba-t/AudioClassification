@@ -10,4 +10,4 @@
   * mp3_2_wav.py: The script to convert mp3 files to wav files
   * ***MAURICIO's CNN file*** 
 * res: the files needed for the algorithm including feature csv files, spectograms, training labels, ...</li>
-*kaggle_submissions: the kaggle submission files that signify major improvements in our project
+* kaggle_submissions: the kaggle submission files that signify major improvements in our project
