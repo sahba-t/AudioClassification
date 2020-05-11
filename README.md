@@ -9,5 +9,6 @@
   * pca_ops.py: all the methods necessary to read wave files, apply pca, and saved the result
   * mp3_2_wav.py: The script to convert mp3 files to wav files
   * ***CNN.ipynb*** reads wav files, writes spectrograms, reads spectrograms, trains and predicts sprectrograms using with CNN
+  * CNN.py:  Our experimentations on Xena, mostly same functions in the notebook + some utility functions.
 * res: the files needed for the algorithm including feature csv files, spectograms, training labels, ...</li>
 * kaggle_submissions: the kaggle submission files that signify major improvements in our project
